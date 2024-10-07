@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 const Landing: React.FC = () => {
 	const [name, setName] = useState<string>("");
 	const [roomID, setRoomID] = useState<string>("");
+	const navigate = useNavigate()
 
 	const createRoom = async () => {
 		console.log("Create Room");
@@ -11,6 +13,7 @@ const Landing: React.FC = () => {
 
 	const joinRoom = async () => {
 		console.log(`Joining room ${roomID}`);
+		navigate(`/conference/${roomID}`)
 		setName(""); setRoomID("");
 	}
 

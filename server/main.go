@@ -20,7 +20,9 @@ func main() {
 	api := app.Group("/api")
 
 	api.Post("/rooms", handlers.CreateRoom)
-	api.Get("/rooms/:roomID", handlers.JoinRoom)
+
+	// websocket connection
+	api.Use("/rooms/:roomID", handlers.JoinRoom)
 
 	port := os.Getenv("PORT")
 	if port == "" {
