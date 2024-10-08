@@ -9,7 +9,8 @@ import (
 )
 
 type Room struct {
-	clients map[*websocket.Conn]bool
+	// connection: name
+	clients map[*websocket.Conn]string
 	lock    sync.Mutex
 }
 
@@ -36,7 +37,7 @@ func CreateRoom() string {
 	roomID := generateCode()
 
 	room := &Room{
-		clients: make(map[*websocket.Conn]bool),
+		clients: make(map[*websocket.Conn]string),
 	}
 
 	rooms[roomID] = room
@@ -48,4 +49,38 @@ func RoomExists(roomID string) bool {
 	_, exists := rooms[roomID]
 
 	return exists
+}
+
+func JoinRoom(roomID string, conn *websocket.Conn, name string) {
+	room := rooms[roomID]
+
+	room.lock.Lock()
+	room.clients[conn] = name
+	room.lock.Unlock()
+}
+
+func LeaveRoom(roomID string, conn *websocket.Conn) {
+	room := rooms[roomID]
+
+	room.lock.Lock()
+	delete(room.clients, conn)
+	room.lock.Unlock()
+}
+
+func Broadcast(roomID string, conn *websocket.Conn, message []byte) error {
+	room := rooms[roomID]
+
+	for client := range room.clients {
+		// exclude the sender
+		if client == conn {
+			continue
+		}
+
+		// send message to all
+		if err := client.WriteMessage(websocket.TextMessage, message); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
