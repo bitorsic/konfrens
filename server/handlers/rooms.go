@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"fmt"
 	"konfrens/utils"
 
 	"github.com/gofiber/contrib/websocket"
@@ -34,41 +33,53 @@ func JoinRoom(c *fiber.Ctx) error {
 	return websocket.New(func(c *websocket.Conn) {
 		roomID := c.Params("roomID")
 		name := c.Query("name")
+		var message utils.Message
+
 		if name == "" {
-			message := "Name cannot be empty"
-			c.WriteMessage(websocket.TextMessage, []byte(message))
+			message.Type = utils.Error
+			message.Data = "Name cannot be empty"
+
+			err := c.WriteJSON(&message)
+			if err != nil {
+				log.Error(err)
+			}
+
 			c.Close()
 			return
 		}
 
 		if !utils.RoomExists(roomID) {
-			message := "Room with ID " + roomID + " does not exist"
-			c.WriteMessage(websocket.TextMessage, []byte(message))
+			message.Type = utils.Error
+			message.Data = "Room with ID " + roomID + " does not exist"
+
+			err := c.WriteJSON(&message)
+			if err != nil {
+				log.Error(err)
+			}
+
 			c.Close()
 			return
 		}
 
 		utils.JoinRoom(roomID, c, name)
-		fmt.Printf("Room %v joined by %v", roomID, name)
 
 		// Keep the connection alive by listening for messages in a loop
 		for {
-			_, msg, err := c.ReadMessage()
+			err := c.ReadJSON(&message)
 			if err != nil {
-				log.Error("Connection closed:", err)
+				log.Error("Connection closed: ", err)
 				break // Exit the loop if the connection closes
 			}
 
 			// when received a message, broadcast it to other users in the room
-			err = utils.Broadcast(roomID, c, msg)
+			err = utils.Broadcast(roomID, c, message)
 			if err != nil {
-				c.WriteMessage(websocket.TextMessage, []byte(err.Error()))
+				log.Error(err)
 			}
 		}
 
 		defer func() {
 			utils.LeaveRoom(roomID, c)
-			fmt.Printf("Room %v left by %v", roomID, name)
 			c.Close()
 		}()
 	}, *config)(c)

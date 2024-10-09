@@ -2,6 +2,7 @@ package utils
 
 import (
 	"crypto/rand"
+	"errors"
 	"math/big"
 	"sync"
 
@@ -67,8 +68,17 @@ func LeaveRoom(roomID string, conn *websocket.Conn) {
 	room.lock.Unlock()
 }
 
-func Broadcast(roomID string, conn *websocket.Conn, message []byte) error {
+func Broadcast(roomID string, conn *websocket.Conn, message Message) error {
 	room := rooms[roomID]
+	room.lock.Lock()
+	defer room.lock.Unlock()
+
+	// get name to fill 'from' field
+	name, ok := room.clients[conn]
+	if !ok {
+		return errors.New("client not found in room")
+	}
+	message.From = name
 
 	for client := range room.clients {
 		// exclude the sender
@@ -77,7 +87,8 @@ func Broadcast(roomID string, conn *websocket.Conn, message []byte) error {
 		}
 
 		// send message to all
-		if err := client.WriteMessage(websocket.TextMessage, message); err != nil {
+		err := client.WriteJSON(message)
+		if err != nil {
 			return err
 		}
 	}
