@@ -1,3 +1,4 @@
+import axios from "axios";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -7,7 +8,15 @@ const Landing: React.FC = () => {
 	const navigate = useNavigate()
 
 	const createRoom = async () => {
-		console.log("Create Room");
+		try {
+			const url = import.meta.env.VITE_API_URL + "/rooms"
+			const response = await axios.post<{ room_id: string }>(url)
+			
+			navigate(`/conference/${response.data.room_id}`)
+		} catch (err) {
+			alert(err)
+		}
+
 		setName("");
 	}
 
