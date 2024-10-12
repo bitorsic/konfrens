@@ -9,10 +9,10 @@ const Landing: React.FC = () => {
 
 	const createRoom = async () => {
 		try {
-			const url = import.meta.env.VITE_API_URL + "/rooms"
+			const url = `${import.meta.env.VITE_API_URL}/rooms`
 			const response = await axios.post<{ room_id: string }>(url)
 			
-			navigate(`/conference/${response.data.room_id}`)
+			navigate(`/conference/${response.data.room_id}?name=${name}`)
 		} catch (err) {
 			alert(err)
 		}
@@ -21,8 +21,7 @@ const Landing: React.FC = () => {
 	}
 
 	const joinRoom = async () => {
-		console.log(`Joining room ${roomID}`);
-		navigate(`/conference/${roomID}`)
+		navigate(`/conference/${roomID}?name=${name}`)
 		setName(""); setRoomID("");
 	}
 

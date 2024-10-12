@@ -1,11 +1,28 @@
-import { useParams } from "react-router-dom"
+import { useParams, useSearchParams } from "react-router-dom"
 import Navbar from "../components/Navbar"
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+
+type WSMessage = {
+	type: string,
+	from: string | undefined,
+	data: string | unknown,
+}
+
+type ChatMessage = {
+	from: string,
+	content: string,
+}
 
 const Conference = () => {
 	const { roomID } = useParams<{ roomID: string }>()
+	const [searchParams] = useSearchParams();
+	const navigate = useNavigate()
 	const localVideoRef = useRef<HTMLVideoElement>(null);
 	const remoteVideoRef = useRef<HTMLVideoElement>(null);
+
+	const [socket, setSocket] = useState<WebSocket | undefined>()
+	const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
 
 	useEffect(() => {
 		// // Get the local media stream (camera and microphone)
@@ -18,9 +35,35 @@ const Conference = () => {
 		// 	.catch(err => {
 		// 		console.error('Error accessing media devices.', err);
 		// 	});
+		const name = searchParams.get("name");
+		const url = `${import.meta.env.VITE_API_URL}/rooms/${roomID}?name=${name}`;
+		const newSocket = new WebSocket(url);
+
+		newSocket.onmessage = (event) => {
+			const wsMessage: WSMessage = JSON.parse(event.data)
+
+			console.log("Received from server: ", wsMessage);
+
+			wsMessageHandler(wsMessage)
+		}; 
+		
+		newSocket.onclose = () => { 
+			alert("WebSocket connection closed");
+			navigate("/");
+		};
+
+		setSocket(newSocket);
 
 		// TODO: Add WebRTC or WebSocket logic to display the remote stream in remoteVideoRef
-	}, []);
+	
+	}, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+	const wsMessageHandler = (wsMessage: WSMessage) => {
+		switch(wsMessage.type) {
+			case "chat":
+
+		}
+	}
 
 	return (
 		<div className="flex flex-col h-screen">

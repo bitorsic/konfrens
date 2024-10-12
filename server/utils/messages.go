@@ -3,10 +3,11 @@ package utils
 type MessageType string
 
 const (
-	Error MessageType = "error"
-	Chat  MessageType = "chat"
-	SDP   MessageType = "sdp"
-	ICE   MessageType = "ice"
+	Error     MessageType = "error"
+	Chat      MessageType = "chat"
+	SDPOffer  MessageType = "sdp-offer"
+	SDPAnswer MessageType = "sdp-answer"
+	ICE       MessageType = "ice"
 )
 
 type Message struct {
