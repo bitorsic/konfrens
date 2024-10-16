@@ -35,19 +35,18 @@ const Conference = () => {
 		// 	.catch(err => {
 		// 		console.error('Error accessing media devices.', err);
 		// 	});
+
+		
 		const name = searchParams.get("name");
 		const url = `${import.meta.env.VITE_API_URL}/rooms/${roomID}?name=${name}`;
 		const newSocket = new WebSocket(url);
 
 		newSocket.onmessage = (event) => {
 			const wsMessage: WSMessage = JSON.parse(event.data)
-
-			console.log("Received from server: ", wsMessage);
-
 			wsMessageHandler(wsMessage)
-		}; 
-		
-		newSocket.onclose = () => { 
+		};
+
+		newSocket.onclose = () => {
 			alert("WebSocket connection closed");
 			navigate("/");
 		};
@@ -55,13 +54,39 @@ const Conference = () => {
 		setSocket(newSocket);
 
 		// TODO: Add WebRTC or WebSocket logic to display the remote stream in remoteVideoRef
-	
+
+		// Cleanup event listener when the component unmounts or when the socket changes
+		return () => {
+			if (socket) {
+				socket.close();
+			}
+		};
+
 	}, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-	const wsMessageHandler = (wsMessage: WSMessage) => {
-		switch(wsMessage.type) {
+	const wsMessageHandler = async (wsMessage: WSMessage) => {
+		switch (wsMessage.type) {
 			case "chat":
+				chatMessageHandler(wsMessage);
+				break;
+			case "error":
+				alert(wsMessage.data);
+				break;
+			default:
+				alert("Invalid websocket message received");
+		}
+	}
 
+	const chatMessageHandler = async (wsMessage: WSMessage) => {
+		if (wsMessage.from && typeof wsMessage.data === "string") {
+			const newChat: ChatMessage = {
+				from: wsMessage.from,
+				content: wsMessage.data,
+			}
+
+			setChatMessages((prevMessages) => [newChat, ...prevMessages]);
+		} else {
+			alert("Invalid wsMessage format");
 		}
 	}
 
@@ -96,12 +121,11 @@ const Conference = () => {
 						<h2 className="text-xl font-semibold mb-4">Chat</h2>
 						<div className="flex-grow overflow-y-auto p-2 bg-gray-100 rounded mb-4">
 							{/* Chat messages would go here */}
-							<div className="message">
-								<span className="font-semibold">User 1:</span> Hello!
-							</div>
-							<div className="message">
-								<span className="font-semibold">User 2:</span> Hi there!
-							</div>
+							{chatMessages.map(chatMessage =>
+								<div className="message">
+									<span className="font-semibold">{chatMessage.from}:</span> {chatMessage.content}
+								</div>
+							)}
 						</div>
 
 						<div className="flex">

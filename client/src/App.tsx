@@ -3,7 +3,6 @@ import Landing from './pages/Landing'
 import Conference from './pages/Conference'
 
 function App() {
-
   return (
     <BrowserRouter>
       <Routes>
