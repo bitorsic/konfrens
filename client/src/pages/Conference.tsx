@@ -23,6 +23,7 @@ const Conference = () => {
 
 	const [socket, setSocket] = useState<WebSocket | undefined>()
 	const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+	const [chatContent, setChatContent] = useState<string>("")
 
 	useEffect(() => {
 		// // Get the local media stream (camera and microphone)
@@ -36,9 +37,8 @@ const Conference = () => {
 		// 		console.error('Error accessing media devices.', err);
 		// 	});
 
-		
-		const name = searchParams.get("name");
-		const url = `${import.meta.env.VITE_API_URL}/rooms/${roomID}?name=${name}`;
+		const username = searchParams.get("name");
+		const url = `${import.meta.env.VITE_API_URL}/rooms/${roomID}?name=${username}`;
 		const newSocket = new WebSocket(url);
 
 		newSocket.onmessage = (event) => {
@@ -77,7 +77,7 @@ const Conference = () => {
 		}
 	}
 
-	const chatMessageHandler = async (wsMessage: WSMessage) => {
+	const chatMessageHandler = (wsMessage: WSMessage) => {
 		if (wsMessage.from && typeof wsMessage.data === "string") {
 			const newChat: ChatMessage = {
 				from: wsMessage.from,
@@ -88,6 +88,22 @@ const Conference = () => {
 		} else {
 			alert("Invalid wsMessage format");
 		}
+	}
+
+	const sendChat = () => {
+		const username = searchParams.get("name");
+		if (!socket) { alert("Socket was not mounted"); return; }
+		if (!username) { alert("name parameter not passed"); return; }
+
+		const newChat: ChatMessage = {
+			from: username,
+			content: chatContent,
+		}
+
+		socket.send(JSON.stringify({ type: "chat", data: chatContent }));
+
+		setChatMessages((prevMessages) => [newChat, ...prevMessages]);
+		setChatContent("");	
 	}
 
 	return (
@@ -119,7 +135,7 @@ const Conference = () => {
 				<div className="w-1/4 bg-white p-4 border-l border-gray-200">
 					<div className="flex flex-col h-full">
 						<h2 className="text-xl font-semibold mb-4">Chat</h2>
-						<div className="flex-grow overflow-y-auto p-2 bg-gray-100 rounded mb-4">
+						<div className="flex-grow overflow-y-scroll p-2 bg-gray-100 rounded mb-4">
 							{/* Chat messages would go here */}
 							{chatMessages.map(chatMessage =>
 								<div className="message">
@@ -131,10 +147,17 @@ const Conference = () => {
 						<div className="flex">
 							<input
 								type="text"
+								value={chatContent}
+								onChange={(e) => setChatContent(e.target.value)}
 								placeholder="Type your message..."
 								className="flex-grow p-2 border rounded-l-md focus:outline-none"
 							/>
-							<button className="p-2 bg-blue-600 text-white rounded-r-md">Send</button>
+							<button
+								onClick={sendChat}
+								className="p-2 bg-blue-600 text-white rounded-r-md"
+							>
+								Send
+							</button>
 						</div>
 					</div>
 				</div>
