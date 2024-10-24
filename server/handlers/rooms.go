@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"konfrens/utils"
 
 	"github.com/gofiber/contrib/websocket"
@@ -67,11 +68,12 @@ func JoinRoom(c *fiber.Ctx) error {
 		for {
 			err := c.ReadJSON(&message)
 			if err != nil {
-				log.Error("Connection closed: ", err)
+				log.Info("Connection closed: ", err)
 				break // Exit the loop if the connection closes
 			}
 
 			// when received a message, broadcast it to other users in the room
+			fmt.Printf("%v: %v\n", name, message)
 			err = utils.Broadcast(roomID, c, message)
 			if err != nil {
 				log.Error(err)

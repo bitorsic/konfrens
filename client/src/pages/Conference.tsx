@@ -17,26 +17,16 @@ type ChatMessage = {
 const Conference = () => {
 	const { roomID } = useParams<{ roomID: string }>()
 	const [searchParams] = useSearchParams();
-	const navigate = useNavigate()
+	const navigate = useNavigate();
 	const localVideoRef = useRef<HTMLVideoElement>(null);
 	const remoteVideoRef = useRef<HTMLVideoElement>(null);
 
-	const [socket, setSocket] = useState<WebSocket | undefined>()
-	const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
-	const [chatContent, setChatContent] = useState<string>("")
+	const [socket, setSocket] = useState<WebSocket | undefined>();
+	const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+	const [chatContent, setChatContent] = useState<string>("");
+	const [peerConnection, setPeerConnection] = useState<RTCPeerConnection | null>(null);
 
 	useEffect(() => {
-		// // Get the local media stream (camera and microphone)
-		// navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-		// 	.then(stream => {
-		// 		if (localVideoRef.current) {
-		// 			localVideoRef.current.srcObject = stream;
-		// 		}
-		// 	})
-		// 	.catch(err => {
-		// 		console.error('Error accessing media devices.', err);
-		// 	});
-
 		const username = searchParams.get("name");
 		const url = `${import.meta.env.VITE_API_URL}/rooms/${roomID}?name=${username}`;
 		const newSocket = new WebSocket(url);
@@ -53,8 +43,6 @@ const Conference = () => {
 
 		setSocket(newSocket);
 
-		// TODO: Add WebRTC or WebSocket logic to display the remote stream in remoteVideoRef
-
 		// Cleanup event listener when the component unmounts or when the socket changes
 		return () => {
 			if (socket) {
@@ -64,10 +52,66 @@ const Conference = () => {
 
 	}, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+	// after socket mounts, initiate WebRTC connection and set peer
+	useEffect(() => {
+		(async () => {
+			if (!socket) return;
+
+			const myStream = await getLocalMediaStream();
+			if (!myStream) return;
+
+			// setting up WebRTC
+			const peer = new RTCPeerConnection({
+				iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+			});
+			myStream.getTracks().forEach(track => peer.addTrack(track, myStream));
+
+			// handle ICE candidates
+			peer.onicecandidate = (event) => {
+				if (event.candidate) {
+					socket.send(JSON.stringify({ type: "ice", data: event.candidate }));
+				}
+			};
+
+			// handle remote stream
+			peer.ontrack = (event) => {
+				if (remoteVideoRef.current) {
+					remoteVideoRef.current.srcObject = event.streams[0];
+				}
+			};
+
+			setPeerConnection(peer);
+		})();
+	}, [socket]);
+
+	// get the local media stream (camera and microphone)
+	const getLocalMediaStream = async () => {
+		try {
+			const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+
+			if (localVideoRef.current) {
+				localVideoRef.current.srcObject = stream;
+			}
+
+			return stream;
+		} catch (err) {
+			alert(`Could not access media devices. ${err}`);
+		}
+	}
+
 	const wsMessageHandler = async (wsMessage: WSMessage) => {
 		switch (wsMessage.type) {
 			case "chat":
 				chatMessageHandler(wsMessage);
+				break;
+			case "sdp-offer":
+				await handleSDPOffer(wsMessage.data as RTCSessionDescriptionInit);
+				break;
+			case "sdp-answer":
+				await handleSDPAnswer(wsMessage.data as RTCSessionDescriptionInit);
+				break;
+			case "ice":
+				await handleICECandidate(wsMessage.data as RTCIceCandidate);
 				break;
 			case "error":
 				alert(wsMessage.data);
@@ -90,6 +134,25 @@ const Conference = () => {
 		}
 	}
 
+	const handleSDPOffer = async (offer: RTCSessionDescriptionInit) => {
+		if (!peerConnection) return;
+		await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+		const answer = await peerConnection.createAnswer();
+		await peerConnection.setLocalDescription(answer);
+
+		socket?.send(JSON.stringify({ type: "sdp-answer", data: answer }));
+	};
+
+	const handleSDPAnswer = async (answer: RTCSessionDescriptionInit) => {
+		if (!peerConnection) return;
+		await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+	};
+
+	const handleICECandidate = async (candidate: RTCIceCandidate) => {
+		if (!peerConnection) return;
+		await peerConnection.addIceCandidate(candidate);
+	};
+
 	const sendChat = () => {
 		const username = searchParams.get("name");
 		if (!socket) { alert("Socket was not mounted"); return; }
@@ -103,7 +166,7 @@ const Conference = () => {
 		socket.send(JSON.stringify({ type: "chat", data: chatContent }));
 
 		setChatMessages((prevMessages) => [newChat, ...prevMessages]);
-		setChatContent("");	
+		setChatContent("");
 	}
 
 	return (
