@@ -31,11 +31,6 @@ const Conference = () => {
 		const url = `${import.meta.env.VITE_API_URL}/rooms/${roomID}?name=${username}`;
 		const newSocket = new WebSocket(url);
 
-		newSocket.onmessage = (event) => {
-			const wsMessage: WSMessage = JSON.parse(event.data)
-			wsMessageHandler(wsMessage)
-		};
-
 		newSocket.onclose = () => {
 			alert("WebSocket connection closed");
 			navigate("/");
@@ -54,9 +49,9 @@ const Conference = () => {
 
 	// after socket mounts, initiate WebRTC connection and set peer
 	useEffect(() => {
-		(async () => {
-			if (!socket) return;
+		if (!socket) return;
 
+		(async () => {
 			const myStream = await getLocalMediaStream();
 			if (!myStream) return;
 
@@ -66,23 +61,40 @@ const Conference = () => {
 			});
 			myStream.getTracks().forEach(track => peer.addTrack(track, myStream));
 
-			// handle ICE candidates
-			peer.onicecandidate = (event) => {
-				if (event.candidate) {
-					socket.send(JSON.stringify({ type: "ice", data: event.candidate }));
-				}
-			};
-
 			// handle remote stream
-			peer.ontrack = (event) => {
+			peer.ontrack = async (event) => {
 				if (remoteVideoRef.current) {
 					remoteVideoRef.current.srcObject = event.streams[0];
 				}
 			};
 
+			peer.onicecandidate = async (event) => {
+				if (event.candidate)
+					socket.send(JSON.stringify({ type: "ice", data: event.candidate }));
+			}
+
 			setPeerConnection(peer);
 		})();
 	}, [socket]);
+
+	// when the peerConnection is set, attach handlers, and send sdp offer
+	useEffect(() => {
+		if (!peerConnection || !socket) return;
+
+		(async () => {
+			socket.onmessage = (event) => {
+				const wsMessage: WSMessage = JSON.parse(event.data);
+				console.log(`Received wsMessage: ${JSON.stringify(wsMessage)}`);
+				wsMessageHandler(wsMessage);
+			};
+
+			const offer = await peerConnection.createOffer();
+			await peerConnection.setLocalDescription(offer);
+
+			// Send the SDP offer via WebSocket
+			socket.send(JSON.stringify({ type: "sdp-offer", data: offer }));
+		})();
+	}, [peerConnection, socket]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	// get the local media stream (camera and microphone)
 	const getLocalMediaStream = async () => {
@@ -134,25 +146,6 @@ const Conference = () => {
 		}
 	}
 
-	const handleSDPOffer = async (offer: RTCSessionDescriptionInit) => {
-		if (!peerConnection) return;
-		await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-		const answer = await peerConnection.createAnswer();
-		await peerConnection.setLocalDescription(answer);
-
-		socket?.send(JSON.stringify({ type: "sdp-answer", data: answer }));
-	};
-
-	const handleSDPAnswer = async (answer: RTCSessionDescriptionInit) => {
-		if (!peerConnection) return;
-		await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
-	};
-
-	const handleICECandidate = async (candidate: RTCIceCandidate) => {
-		if (!peerConnection) return;
-		await peerConnection.addIceCandidate(candidate);
-	};
-
 	const sendChat = () => {
 		const username = searchParams.get("name");
 		if (!socket) { alert("Socket was not mounted"); return; }
@@ -168,6 +161,42 @@ const Conference = () => {
 		setChatMessages((prevMessages) => [newChat, ...prevMessages]);
 		setChatContent("");
 	}
+
+	const handleSDPOffer = async (offer: RTCSessionDescriptionInit) => {
+		if (!peerConnection || !socket) {
+			alert("Could not send SDP Offer");
+			return;
+		}
+
+		await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+		const answer = await peerConnection.createAnswer();
+		await peerConnection.setLocalDescription(answer);
+		socket.send(JSON.stringify({ type: "sdp-answer", data: answer }));
+	};
+
+	const handleSDPAnswer = async (answer: RTCSessionDescriptionInit) => {
+		if (!peerConnection || !socket) {
+			alert("Could not send SDP Answer");
+			return;
+		}
+
+		await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+
+		// handle ICE candidates
+		peerConnection.onicecandidate = (event) => {
+			if (event.candidate) {
+				socket.send(JSON.stringify({ type: "ice", data: event.candidate }));
+			}
+		};
+	};
+
+	const handleICECandidate = async (candidate: RTCIceCandidate) => {
+		if (!peerConnection) {
+			alert("Could not send ICE Candidate");
+			return;
+		}
+		await peerConnection.addIceCandidate(candidate);
+	};
 
 	return (
 		<div className="flex flex-col h-screen">

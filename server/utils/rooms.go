@@ -9,6 +9,8 @@ import (
 	"github.com/gofiber/contrib/websocket"
 )
 
+const roomLimit = 2 // can be changed as use case expands
+
 type Room struct {
 	// connection: name
 	clients map[*websocket.Conn]string
@@ -52,6 +54,7 @@ func RoomExists(roomID string) bool {
 	return exists
 }
 
+// TODO: enforce room limit, separate offerer and answerer somehow
 func JoinRoom(roomID string, conn *websocket.Conn, name string) {
 	room := rooms[roomID]
 
