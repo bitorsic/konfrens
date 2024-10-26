@@ -3,6 +3,7 @@ package utils
 import (
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"math/big"
 	"sync"
 
@@ -48,10 +49,18 @@ func CreateRoom() string {
 	return roomID
 }
 
-func RoomExists(roomID string) bool {
-	_, exists := rooms[roomID]
+func RoomExistsAndIsVacant(roomID string) bool {
+	room, exists := rooms[roomID]
 
-	return exists
+	if !exists {
+		return false
+	}
+
+	if len(room.clients) == roomLimit {
+		return false
+	}
+
+	return true
 }
 
 // TODO: enforce room limit, separate offerer and answerer somehow
@@ -68,6 +77,14 @@ func LeaveRoom(roomID string, conn *websocket.Conn) {
 
 	room.lock.Lock()
 	delete(room.clients, conn)
+
+	// delete room if no participants
+	if len(room.clients) == 0 {
+		delete(rooms, roomID)
+	}
+
+	fmt.Println(rooms)
+
 	room.lock.Unlock()
 }
 

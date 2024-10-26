@@ -35,6 +35,10 @@ const Conference = () => {
 			alert("WebSocket connection closed");
 			navigate("/");
 		};
+		newSocket.onmessage = (event) => {
+			const wsMessage: WSMessage = JSON.parse(event.data);
+			if (wsMessage.type == "error") alert(wsMessage.data);
+		}
 
 		setSocket(newSocket);
 
@@ -84,7 +88,6 @@ const Conference = () => {
 		(async () => {
 			socket.onmessage = (event) => {
 				const wsMessage: WSMessage = JSON.parse(event.data);
-				console.log(`Received wsMessage: ${JSON.stringify(wsMessage)}`);
 				wsMessageHandler(wsMessage);
 			};
 

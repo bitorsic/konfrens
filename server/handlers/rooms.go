@@ -49,9 +49,9 @@ func JoinRoom(c *fiber.Ctx) error {
 			return
 		}
 
-		if !utils.RoomExists(roomID) {
+		if !utils.RoomExistsAndIsVacant(roomID) {
 			message.Type = utils.Error
-			message.Data = "Room with ID " + roomID + " does not exist"
+			message.Data = "Room with ID " + roomID + " does not exist / room full"
 
 			err := c.WriteJSON(&message)
 			if err != nil {
