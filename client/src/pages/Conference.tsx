@@ -25,6 +25,7 @@ const Conference = () => {
 	const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
 	const [chatContent, setChatContent] = useState<string>("");
 	const [peerConnection, setPeerConnection] = useState<RTCPeerConnection | null>(null);
+	const [username, setUsername] = useState<string>("")
 
 	useEffect(() => {
 		const username = searchParams.get("name");
@@ -115,6 +116,9 @@ const Conference = () => {
 	}
 
 	const wsMessageHandler = async (wsMessage: WSMessage) => {
+		// set the visible username
+		if (username === "" && wsMessage.from) setUsername(wsMessage.from);
+
 		switch (wsMessage.type) {
 			case "chat":
 				chatMessageHandler(wsMessage);
@@ -210,11 +214,13 @@ const Conference = () => {
 					{/* Remote video */}
 					<video
 						ref={remoteVideoRef}
-						className="w-full h-full object-cover"
+						className="h-full object-cover"
 						autoPlay
 						playsInline
-						muted
 					></video>
+					<div className="absolute bottom-0 bg-gray-900 bg-opacity-75 text-white p-2">
+						{(username === "") ? "Loading..." : username}
+					</div>
 
 					{/* Local video in a smaller block */}
 					<video

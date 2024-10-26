@@ -3,7 +3,6 @@ package utils
 import (
 	"crypto/rand"
 	"errors"
-	"fmt"
 	"math/big"
 	"sync"
 
@@ -82,8 +81,6 @@ func LeaveRoom(roomID string, conn *websocket.Conn) {
 	if len(room.clients) == 0 {
 		delete(rooms, roomID)
 	}
-
-	fmt.Println(rooms)
 
 	room.lock.Unlock()
 }
